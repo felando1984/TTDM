@@ -428,7 +428,7 @@ public class ShowMap : MonoBehaviour
         string[] POI_labels = { };
         Color[] POI_colors = { };
 
-        if (graph_op == 0)
+        if (graph_op == 0)//Build 0061, Topology 1
         {
             // Build 0034
             map.Initialize(new Mapbox.Utils.Vector2d(62.4750425, 6.1914948), 17);
@@ -444,7 +444,7 @@ public class ShowMap : MonoBehaviour
             slrStopTime.maxValue = slrStartTime.maxValue;
             slrStopTime.value = slrStopTime.maxValue;
         }
-        else if (graph_op == 2)
+        else if (graph_op == 1)//Build 0061, Topology 2, // graph_op == 2
         {
             //map.ResetMap();           
             //map.SetZoom(17);
@@ -468,7 +468,7 @@ public class ShowMap : MonoBehaviour
             slrStopTime.maxValue = slrStartTime.maxValue;
             slrStopTime.value = slrStopTime.maxValue;
         }
-        else if (graph_op == 3)
+        else if (graph_op == 2)//Build 0061, Topology 3, // graph_op == 3
         {
 
             //map.Initialize(new Mapbox.Utils.Vector2d(62.4750425, 6.1914948), 17);
@@ -489,11 +489,11 @@ public class ShowMap : MonoBehaviour
             //string[] strPOIs = { "278087398", "7204337168", "8714559173", "7379970801" };
             //Color[] clrPOIs = { Color.blue, Color.red, Color.green, Color.magenta };
             // solution 1
-            //string[] strPOIs = { "278087398", "7204337168", "8714559173" };
-            //Color[] clrPOIs = { Color.blue, Color.red, Color.green };
+            string[] strPOIs = { "278087398", "7204337168", "8714559173" };
+            Color[] clrPOIs = { Color.blue, Color.red, Color.green };
             // solution 2
-            string[] strPOIs = { "278087398", "7204337168", "7379970801" };
-            Color[] clrPOIs = { Color.blue, Color.red, Color.magenta };
+            //string[] strPOIs = { "278087398", "7204337168", "7379970801" };
+            //Color[] clrPOIs = { Color.blue, Color.red, Color.magenta };
             POI_labels = strPOIs;
             POI_colors = clrPOIs;
             timeSteps = -1; //timeSteps = 59;
@@ -507,7 +507,7 @@ public class ShowMap : MonoBehaviour
             slrStopTime.value = slrStopTime.maxValue;
         }
         // Build 0013, alesund graph
-        else if (graph_op == 4)
+        else if (graph_op == 14) //Build 0061, Graph5, // graph_op == 4
         {
             map.Initialize(new Mapbox.Utils.Vector2d(62.49, 6.3), 12);
             bg_Mapbox.Initialize(new Mapbox.Utils.Vector2d(62.49, 6.3), 12);
@@ -534,7 +534,7 @@ public class ShowMap : MonoBehaviour
         }
         //
         // Build 0021, alesund road05 graph
-        else if (graph_op == 5)
+        else if (graph_op == 3) //Build 0061, Topology 4, // graph_op == 5
         {
             map.Initialize(new Mapbox.Utils.Vector2d(62.487133353397, 6.241912657788008), 12);//(62.64, 6.4), 10)
             //map.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(62.6138851, 6.5737325));
@@ -1484,7 +1484,7 @@ public class ShowMap : MonoBehaviour
 
             // Build 0058
             // CFH computation
-            bool enableCFH = false;
+            bool enableCFH = true;
             bool computeDensity = (drnCFHInput.value == 1);
             float thr = 0;
             if (computeDensity)

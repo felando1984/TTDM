@@ -7035,7 +7035,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: graphset 1
+  m_Text: Topology 1
 --- !u!222 &685514651
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -11129,17 +11129,13 @@ MonoBehaviour:
   m_Value: 0
   m_Options:
     m_Options:
-    - m_Text: graphset 1
+    - m_Text: Topology 1
       m_Image: {fileID: 0}
-    - m_Text: graphset 2
+    - m_Text: Topology 2
       m_Image: {fileID: 0}
-    - m_Text: graphset 3
+    - m_Text: Topology 3
       m_Image: {fileID: 0}
-    - m_Text: graphset 4
-      m_Image: {fileID: 0}
-    - m_Text: graphset 5
-      m_Image: {fileID: 0}
-    - m_Text: graphset 6
+    - m_Text: Topology 4
       m_Image: {fileID: 0}
     - m_Text: customized
       m_Image: {fileID: 0}
