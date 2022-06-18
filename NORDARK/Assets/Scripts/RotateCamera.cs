@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Mapbox.Unity.Map;
 
 public class RotateCamera : MonoBehaviour
 {
@@ -25,6 +26,12 @@ public class RotateCamera : MonoBehaviour
     public Vector3 default_pos;
     public Vector3 default_rot;
 
+    private AbstractMap bg_Mapbox;
+    public float MapZoomSpeed = 1.5f;
+    public float MapMoveSpeed = 0.001f;
+    public float MapZoom;
+    public double MapGeoLng;
+    public double MapGeoLat;
 
     // Use this for initialization
     void Start()
@@ -33,6 +40,11 @@ public class RotateCamera : MonoBehaviour
         this.pitch = this.transform.eulerAngles.x;
         default_pos = this.transform.position;
         default_rot = this.transform.eulerAngles;
+
+        bg_Mapbox = GameObject.Find("BG_Mapbox").GetComponent<AbstractMap>();
+        MapZoom = bg_Mapbox.Zoom;
+        MapGeoLng = bg_Mapbox.CenterLatitudeLongitude.x;
+        MapGeoLat = bg_Mapbox.CenterLatitudeLongitude.y;
     }
 
     // Update is called once per frame
@@ -76,14 +88,47 @@ public class RotateCamera : MonoBehaviour
             this.transform.eulerAngles = new Vector3(this.pitch, this.yaw, 0f);
         }
 
-        //drag camera around with Middle Mouse
-        if (Input.GetMouseButton(2))
+        // Build 0063, if press Alt, then zoom the map and move the center position
+        //62.4676991855481, 6.30334069538369
+        //17.45
+        bool updateMap = false;
+        if (Input.GetKey(KeyCode.LeftControl))
         {
-            transform.Translate(-Input.GetAxisRaw("Mouse X") * Time.deltaTime * dragSpeed, -Input.GetAxisRaw("Mouse Y") * Time.deltaTime * dragSpeed, 0);
+            // the scale of the tile will change, 1,2,4,8
+            MapZoom += Input.GetAxis("Mouse ScrollWheel") * MapZoomSpeed;
+            Debug.Log(MapZoom);
+            if (bg_Mapbox.Zoom != MapZoom)
+            {
+                bg_Mapbox.SetZoom(MapZoom);
+                updateMap = true;
+
+            }
+            if (Input.GetMouseButton(2))
+            {
+                if (MapGeoLng == 0)
+                    MapGeoLng = bg_Mapbox.CenterLatitudeLongitude.x;
+                if (MapGeoLat == 0)
+                    MapGeoLat = bg_Mapbox.CenterLatitudeLongitude.y;
+                MapGeoLat -= Input.GetAxisRaw("Mouse X") * Time.deltaTime * MapMoveSpeed / Mathf.Pow(2, MapZoom);
+                MapGeoLng -= Input.GetAxisRaw("Mouse Y") * Time.deltaTime * MapMoveSpeed / Mathf.Pow(2, MapZoom);
+                if ((bg_Mapbox.CenterLatitudeLongitude.x != MapGeoLng) || (bg_Mapbox.CenterLatitudeLongitude.y != MapGeoLat))
+                {
+                    bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(MapGeoLng, MapGeoLat));
+                    updateMap = true;
+                }
+            }
+            if (updateMap)
+                bg_Mapbox.UpdateMap();
         }
+        else
+        {
+            //drag camera around with Middle Mouse
+            if (Input.GetMouseButton(2))
+            {
+                transform.Translate(-Input.GetAxisRaw("Mouse X") * Time.deltaTime * dragSpeed, -Input.GetAxisRaw("Mouse Y") * Time.deltaTime * dragSpeed, 0);
+            }
 
-        this.transform.Translate(0, 0, Input.GetAxis("Mouse ScrollWheel") * this.zoomSpeed, Space.Self);
-        //}
-
+            this.transform.Translate(0, 0, Input.GetAxis("Mouse ScrollWheel") * this.zoomSpeed, Space.Self);
+        }
     }
 }

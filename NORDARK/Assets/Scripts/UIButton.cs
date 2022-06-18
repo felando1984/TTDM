@@ -18,8 +18,8 @@ public class UIButton : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        other = GameObject.Find("Mapbox").GetComponent<ShowMap>();
-        bars_script = GameObject.Find("Mapbox").GetComponent<BarsVis>();
+        //other = GameObject.Find("Mapbox").GetComponent<ShowMap>();
+        //bars_script = GameObject.Find("Mapbox").GetComponent<BarsVis>();
     }
 
     // Update is called once per frame

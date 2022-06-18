@@ -15,7 +15,7 @@ public class UISlirTimeLine : MonoBehaviour
         slider = gameObject.GetComponent<Slider>();
         slider.onValueChanged.AddListener(delegate { ValueChangeCheck(); });
         label = GameObject.Find("TxtTimeLine").GetComponent<Text>();
-        other = GameObject.Find("Mapbox").GetComponent<ShowMap>();
+        //other = GameObject.Find("Mapbox").GetComponent<ShowMap>();
     }
 
     public void ValueChangeCheck()
