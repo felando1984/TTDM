@@ -27,6 +27,7 @@ public class RotateCamera : MonoBehaviour
     public Vector3 default_rot;
 
     private AbstractMap bg_Mapbox;
+    //private UpdateMap updateMap;
     public float MapZoomSpeed = 1.5f;
     public float MapMoveSpeed = 0.001f;
     public float MapZoom;
@@ -42,6 +43,7 @@ public class RotateCamera : MonoBehaviour
         default_rot = this.transform.eulerAngles;
 
         bg_Mapbox = GameObject.Find("BG_Mapbox").GetComponent<AbstractMap>();
+        //updateMap = GameObject.Find("BG_Mapbox").GetComponent<UpdateMap>();
         MapZoom = bg_Mapbox.Zoom;
         MapGeoLng = bg_Mapbox.CenterLatitudeLongitude.x;
         MapGeoLat = bg_Mapbox.CenterLatitudeLongitude.y;
@@ -118,7 +120,9 @@ public class RotateCamera : MonoBehaviour
                 }
             }
             if (updateMap)
+            {
                 bg_Mapbox.UpdateMap();
+            }
         }
         else
         {
