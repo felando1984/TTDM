@@ -29,11 +29,11 @@ public class BasicSample : MonoBehaviour {
         foreach (var file in IESFolder.GetFiles("*.ies"))
         {
             children.Add(file.Name);
-            IESfilepath = "Assets/IES folder/"+file.Name;
-            IESParser parser = new IESParser();
-            IESfiles = parser.ParseIES(IESfilepath);
+            //IESfilepath = "Assets/IES folder/"+file.Name;
+            //IESParser parser = new IESParser();
+            //IESfiles = parser.ParseIES(IESfilepath);
             
-            Debug.Log (parser.IESversion);
+            //Debug.Log (parser.IESversion);
             
         } 
         
@@ -43,9 +43,6 @@ public class BasicSample : MonoBehaviour {
         int loghtNum = ShowIES.value;
         SelectedIES = ShowIES.options[loghtNum].text;
         //setPosition=false;
-
-        
-
     }
 
     private void TaskOnClick() {
@@ -62,9 +59,6 @@ public class BasicSample : MonoBehaviour {
             }
         }
     }
-
- 
-
     // public void WriteResult(string[] paths) {
     //     if (paths.Length == 0) {
     //         return;

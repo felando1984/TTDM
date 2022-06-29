@@ -36,6 +36,7 @@ public class PlaceLight : MonoBehaviour
             GameObject LightSelected =  GameObject.Find(SelectedLight);
             Debug.Log(LightSelected);
             duplicate = Instantiate(LightSelected);
+            duplicate.transform.localScale = new Vector3(10, 10, 10);
             setPosition =true;
         }
 

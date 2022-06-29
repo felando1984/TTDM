@@ -15,6 +15,8 @@ public class EnvironmentLightControl : MonoBehaviour
     {
         lightIntensity.onValueChanged.AddListener(IntensityChanged);
         lightTemperature.onValueChanged.AddListener(temperatureChanged);
+        lightIntensity.value = environmentLight.intensity;
+        lightTemperature.value = environmentLight.colorTemperature;
     }
 
     private void IntensityChanged(float value){
@@ -28,7 +30,7 @@ public class EnvironmentLightControl : MonoBehaviour
     //Update is called once per frame
     void Update()
     {
-        lightIntensityText.text = "Environment light intensity: " + lightIntensity.value + "Lux";
-        lighttemperatureText.text = "Environment light temperature: " + lightTemperature.value + "Kelvin";
+        lightIntensityText.text = lightIntensity.value + " Lux";
+        lighttemperatureText.text = lightTemperature.value + " Kelvin";
     }
 }

@@ -1,8 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
+using Mapbox.Unity.Utilities;
 using Mapbox.Unity.Map;
+using Newtonsoft.Json;
+using GeoJSON.Net.Feature;
+using GeoJSON.Net.Geometry;
 
 public class UpdateMap : MonoBehaviour
 {
@@ -10,6 +15,7 @@ public class UpdateMap : MonoBehaviour
     private GameObject MainMenu;
     private Dropdown drn_MapStyle;
     private Dropdown drn_Location;
+    private Dropdown drn_LightType;
     private Toggle cbx_Terrian;
     private Toggle cbx_Buildings;
     private Toggle cbx_Roads;
@@ -27,6 +33,33 @@ public class UpdateMap : MonoBehaviour
         //17.45
 
         initGUIMenu();
+        // Load Geojson
+        FeatureCollection fCollection = Can_Deserialize();
+        string[] layer_coords = bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).coordinates;
+        layer_coords = new string[fCollection.Features.Count];
+        // Create nodes if not exist
+        for (int i = 0; i < fCollection.Features.Count; i++)
+        {
+            GeoJSON.Net.Geometry.Point mPoint = fCollection.Features[i].Geometry as GeoJSON.Net.Geometry.Point;
+            var coords = mPoint.Coordinates;
+            {
+                var index = 0;
+                Vector2 latlong;
+                Vector3 pos;
+                Node nodeX;
+                latlong = new Vector2((float)(coords.Latitude), (float)(coords.Longitude));
+                layer_coords[i] = coords.Latitude.ToString() + ", " + coords.Longitude.ToString();
+                pos = latlong.AsUnityPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
+                //// Build 0024, auto adjust to closest nodes
+                //Node nodeR = Node.Create<Node>("node" + graph.RawNodes.Count.ToString(), pos);
+                //graph.AddRawNode(nodeR);
+            }
+            //fCollection.Features[i].Geometry as GeoJSON.Net.Geometry.LineString;
+            //var coords = fCollection.Features[i].Geometry.Coordinates[0].Coordinates;
+        }
+        bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(false);
+        bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).coordinates = layer_coords;
+        bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(true);
     }
 
     // Build 0055
@@ -42,8 +75,15 @@ public class UpdateMap : MonoBehaviour
             if(drn_Location.value == 0)
                 bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(62.4676991855481, 6.30334069538369));
             else
-                bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(59.8539107, 17.6223242));
+                bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(59.809179, 17.7043457));
             bg_Mapbox.UpdateMap();
+        });
+        drn_LightType = GameObject.Find("Drn_LightType").GetComponent<Dropdown>();
+        drn_LightType.onValueChanged.AddListener(delegate {
+            bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(false);
+            string path = @"Assets/Prefabs/StreetLightsPack/";
+            bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab = Resources.Load(drn_LightType.options[drn_LightType.value].text) as GameObject;
+            bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(true);
         });
         cbx_Terrian = GameObject.Find("Cbx_Terrian").GetComponent<Toggle>();
         cbx_Terrian.onValueChanged.AddListener(delegate {
@@ -62,7 +102,7 @@ public class UpdateMap : MonoBehaviour
         });
         cbx_LightPoints = GameObject.Find("Cbx_LightPoints").GetComponent<Toggle>();
         cbx_LightPoints.onValueChanged.AddListener(delegate {
-            //Nodes.SetActive(cbxShowNodes.isOn);
+            bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(cbx_LightPoints.isOn);
         });
     }
 
@@ -101,5 +141,15 @@ public class UpdateMap : MonoBehaviour
                 }
             }
         }
+    }
+    public FeatureCollection Can_Deserialize()
+    {
+        var rd = new StreamReader("LightPoint1 Lerstadvatnet.geojson");// ("viktig.Geojson");
+
+        string json = rd.ReadToEnd();
+
+        var featureCollection = JsonConvert.DeserializeObject<FeatureCollection>(json);
+
+        return featureCollection;
     }
 }
