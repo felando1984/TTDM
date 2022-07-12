@@ -8,6 +8,7 @@ using Mapbox.Unity.Map;
 using Newtonsoft.Json;
 using GeoJSON.Net.Feature;
 using GeoJSON.Net.Geometry;
+using Mapbox.Unity.MeshGeneration.Modifiers;
 
 public class UpdateMap : MonoBehaviour
 {
@@ -20,10 +21,14 @@ public class UpdateMap : MonoBehaviour
     private Toggle cbx_Buildings;
     private Toggle cbx_Roads;
     private Toggle cbx_LightPoints;
+    //private GameObjectModifier buildingsModifier;
+    private ReplaceFeatureCollectionModifier lightModifier;
 
     // Start is called before the first frame update
     void Start()
     {
+        //buildingsModifier = ScriptableObject.CreateInstance<BuildingsModifier>();
+        //lightModifier = ScriptableObject.CreateInstance<ReplaceFeatureCollectionModifier>();
         // Build 0063
         bg_Mapbox = GameObject.Find("BG_Mapbox").GetComponent<AbstractMap>();
         bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(62.4676991855481, 6.30334069538369));
@@ -60,6 +65,17 @@ public class UpdateMap : MonoBehaviour
         bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(false);
         bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).coordinates = layer_coords;
         bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(true);
+        VectorSubLayerProperties LightLayer = bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0);
+        List<string> list_coords = new List<string>();
+        for (int i = 0; i < fCollection.Features.Count; i++)
+        {
+            list_coords.Add(layer_coords[i]);
+        }
+        //bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).MeshModifiers
+        //lightModifier.features[0].PrefabLocations = list_coords;
+        //bg_Mapbox.VectorData.GetFeatureSubLayerAtIndex(2).BehaviorModifiers.AddGameObjectModifier(lightModifier);
+
+        //bg_Mapbox.VectorData.GetFeatureSubLayerAtIndex(0).BehaviorModifiers.AddGameObjectModifier(buildingsModifier);
     }
 
     // Build 0055

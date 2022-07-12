@@ -27925,9 +27925,9 @@ MonoBehaviour:
       - coreOptions:
           sourceId: 
           isActive: 1
-          sublayerName: Untitled
-          geometryType: 0
-          layerName: poi_label
+          sublayerName: LightXX
+          geometryType: 2
+          layerName: building
           snapToTerrain: 1
           combineMeshes: 0
         lineGeometryOptions:
@@ -27937,18 +27937,18 @@ MonoBehaviour:
           JoinType: 1
           CapType: 1
         filterOptions:
-          _selectedLayerName: poi_label
+          _selectedLayerName: building
           filters: []
           combinerType: 0
         extrusionOptions:
-          _selectedLayerName: road
+          _selectedLayerName: building
           extrusionType: 0
           extrusionGeometryType: 0
           propertyName: height
-          propertyDescription: 
+          propertyDescription: Number. Height of building or part of building.
           minimumHeight: 0
           maximumHeight: 1
-          extrusionScaleFactor: 1
+          extrusionScaleFactor: 5
         colliderOptions:
           colliderType: 0
         materialOptions:
@@ -27981,10 +27981,12 @@ MonoBehaviour:
           entityPerCoroutine: 0
         honorBuildingIdSetting: 0
         buildingsWithUniqueIds: 1
-        moveFeaturePositionTo: 0
+        moveFeaturePositionTo: 2
         MeshModifiers: []
-        GoModifiers: []
-        presetFeatureType: 3
+        GoModifiers:
+        - {fileID: 11400000, guid: 51db6febb39079b4ca0746ee91205c8f, type: 2}
+        - {fileID: 11400000, guid: 9cc65532303e9448e8ecbe284fc7f035, type: 2}
+        presetFeatureType: 0
         _maskValue: 0
         selectedTypes: 
       locationPrefabList:
