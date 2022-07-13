@@ -9,6 +9,11 @@ using Newtonsoft.Json;
 using GeoJSON.Net.Feature;
 using GeoJSON.Net.Geometry;
 using Mapbox.Unity.MeshGeneration.Modifiers;
+using UnityEngine.Rendering.HighDefinition;
+using UnityEditor.Rendering;
+using UnityEditor;
+using UnityEditor.AssetImporters;
+using UnityEditor.Experimental.AssetImporters;
 
 public class UpdateMap : MonoBehaviour
 {
@@ -17,12 +22,14 @@ public class UpdateMap : MonoBehaviour
     private Dropdown drn_MapStyle;
     private Dropdown drn_Location;
     private Dropdown drn_LightType;
+    private Dropdown drn_IESType;
     private Toggle cbx_Terrian;
     private Toggle cbx_Buildings;
     private Toggle cbx_Roads;
     private Toggle cbx_LightPoints;
     //private GameObjectModifier buildingsModifier;
     private ReplaceFeatureCollectionModifier lightModifier;
+    string path = @"D:\Documents\GitHub\Ashkan\HDRP\Assets\";
 
     // Start is called before the first frame update
     void Start()
@@ -81,6 +88,10 @@ public class UpdateMap : MonoBehaviour
     // Build 0055
     public void initGUIMenu()
     {
+        GameObject light = Instantiate(Resources.Load("LightType1") as GameObject);// bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab.GetComponentsInChildren<Transform>()[0].gameObject;
+        light.transform.name = "LightDemo";
+        light = light.transform.Find("Spot Light").gameObject;
+
         MainMenu = GameObject.Find("Canvas_Mainmenu");
         drn_MapStyle = GameObject.Find("Drn_MapStyle").GetComponent<Dropdown>();
         drn_MapStyle.onValueChanged.AddListener(delegate {
@@ -100,6 +111,15 @@ public class UpdateMap : MonoBehaviour
             string path = @"Assets/Prefabs/StreetLightsPack/";
             bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab = Resources.Load(drn_LightType.options[drn_LightType.value].text) as GameObject;
             bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(true);
+        });
+        drn_IESType = GameObject.Find("IESList").GetComponent<Dropdown>();
+        drn_IESType.onValueChanged.AddListener(delegate {
+            //GameObject light = GameObject.Find("Spot Light");
+            //light.GetComponent<HDAdditionalLightData>().SetCookie(GetIESCookie(drn_IESType.options[drn_IESType.value].text));
+            //Debug.Log("change to" + drn_IESType.options[drn_IESType.value].text);
+            
+            light.GetComponent<HDAdditionalLightData>().SetCookie(GetIESCookie(drn_IESType.options[drn_IESType.value].text));
+            Debug.Log("change to" + drn_IESType.options[drn_IESType.value].text);
         });
         cbx_Terrian = GameObject.Find("Cbx_Terrian").GetComponent<Toggle>();
         cbx_Terrian.onValueChanged.AddListener(delegate {
@@ -167,5 +187,43 @@ public class UpdateMap : MonoBehaviour
         var featureCollection = JsonConvert.DeserializeObject<FeatureCollection>(json);
 
         return featureCollection;
+    }
+
+    public UnityEngine.Texture GetIESCookie(string filename)
+    {
+        IESEngine engine = new IESEngine();
+        IESMetaData iesMetaData = new IESMetaData();
+
+        engine.TextureGenerationType = TextureImporterType.Default;
+
+        UnityEngine.Texture cookieTexture2D = new Texture2D(2, 2, TextureFormat.ARGB32, false);
+
+        string iesFilePath = path + filename;//Path.Combine(Path.GetDirectoryName(Application.dataPath), ctx.assetPath);
+        string errorMessage = engine.ReadFile(iesFilePath);
+
+        if (string.IsNullOrEmpty(errorMessage))
+        {
+            iesMetaData.FileFormatVersion = "LM-63-2002";// engine.GetFileFormatVersion();
+            iesMetaData.IESPhotometricType = engine.GetPhotometricType();
+            iesMetaData.Manufacturer = engine.GetKeywordValue("MANUFAC");
+            iesMetaData.LuminaireCatalogNumber = engine.GetKeywordValue("LUMCAT");
+            iesMetaData.LuminaireDescription = engine.GetKeywordValue("LUMINAIRE");
+            iesMetaData.LampCatalogNumber = engine.GetKeywordValue("LAMPCAT");
+            iesMetaData.LampDescription = engine.GetKeywordValue("LAMP");
+
+            (iesMetaData.IESMaximumIntensity, iesMetaData.IESMaximumIntensityUnit) = engine.GetMaximumIntensity();
+
+            string warningMessage;
+
+            (warningMessage, cookieTexture2D) = engine.Generate2DCookie(iesMetaData.CookieCompression, iesMetaData.SpotAngle, (int)iesMetaData.iesSize, iesMetaData.ApplyLightAttenuation);
+        }
+        else
+        {
+            Debug.Log($"Cannot read IES file '{iesFilePath}': {errorMessage}");
+        }
+
+        string iesFileName = iesFilePath;// Path.GetFileNameWithoutExtension(ctx.assetPath);
+
+        return cookieTexture2D;
     }
 }
