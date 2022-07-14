@@ -14,6 +14,7 @@ using UnityEditor.Rendering;
 using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEditor.Experimental.AssetImporters;
+using SFB;
 
 public class UpdateMap : MonoBehaviour
 {
@@ -27,8 +28,8 @@ public class UpdateMap : MonoBehaviour
     private Toggle cbx_Buildings;
     private Toggle cbx_Roads;
     private Toggle cbx_LightPoints;
-    private Button btnLoad;
-    private Button btnSave;
+    private Button btn_Load;
+    private Button btn_Save;
     private GameObject mainCamera;
     private double t1;
     private double t2;
@@ -36,10 +37,24 @@ public class UpdateMap : MonoBehaviour
     private GameObject SelectedBuilding;
     private GameObject SelectedFlagCube = null;
     private GameObject RefPlane;
+    private Button tab_Overview;
+    private Button tab_LightObject;
+    private GameObject[] TabMenuList;
+    private Slider slr_RotationY;
+    private Text txt_RotationYValue;
+    private Text txt_LightObjectName;
+    private Dropdown drn_LightIES;
+    private Button btn_uploadIES;
+
+    private string IESFolderPath;
+    private DirectoryInfo IESFolder;
+    private List<string> children = new List<string>();
+
     private bool TestMode = true;
     //private GameObjectModifier buildingsModifier;
     private ReplaceFeatureCollectionModifier lightModifier;
     private GameObject LightsCollection;
+    private Dictionary<string, int> dictLightIndex;
     List<Node> lightNodes;
     string path = @"D:\Documents\GitHub\Ashkan\HDRP\Assets\";
 
@@ -51,7 +66,10 @@ public class UpdateMap : MonoBehaviour
         mainCamera = GameObject.Find("Main Camera");
         RefPlane = GameObject.Find("BG_White_H");
         SelectedFlagCube = GameObject.Find("SelectedCube");
-        SelectedFlagCube.SetActive(false);
+        TabMenuList = new GameObject[2];
+        TabMenuList[0] = GameObject.Find("LeftMenu");
+        TabMenuList[1] = GameObject.Find("TabLightObject");
+        
         //buildingsModifier = ScriptableObject.CreateInstance<BuildingsModifier>();
         //lightModifier = ScriptableObject.CreateInstance<ReplaceFeatureCollectionModifier>();
         // Build 0063
@@ -67,10 +85,13 @@ public class UpdateMap : MonoBehaviour
         LightsCollection.transform.localScale = bg_Mapbox.transform.localScale;
 
         initGUIMenu();
+        ClearSelectedBuilding();
+
         // Load Geojson
         FeatureCollection fCollection = Can_Deserialize();
         string[] layer_coords = bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).coordinates;
         layer_coords = new string[fCollection.Features.Count];
+        dictLightIndex= new Dictionary<string, int>();
         // Create nodes if not exist
         for (int i = 0; i < fCollection.Features.Count; i++)//i < 2; i++)//
         {
@@ -93,7 +114,9 @@ public class UpdateMap : MonoBehaviour
                 lightObject.transform.position = pos;
                 lightObject.transform.localScale = new Vector3(1, 1, 1);
                 lightNode.obj = lightObject;
+                lightNode.IESfileName = children[0];
                 lightNodes.Add(lightNode);
+                dictLightIndex.Add(lightObject.transform.name, i);
             }
             //fCollection.Features[i].Geometry as GeoJSON.Net.Geometry.LineString;
             //var coords = fCollection.Features[i].Geometry.Coordinates[0].Coordinates;
@@ -117,6 +140,18 @@ public class UpdateMap : MonoBehaviour
     // Build 0055
     public void initGUIMenu()
     {
+        btn_uploadIES = GameObject.Find("UploadIESFile").GetComponent<Button>();
+
+        btn_uploadIES.onClick.AddListener(TaskOnClick);
+
+        IESFolderPath = "Assets/IES folder";
+        IESFolder = new DirectoryInfo(IESFolderPath);
+
+        foreach (var file in IESFolder.GetFiles("*.ies"))
+        {
+            children.Add(file.Name);
+        }
+
         GameObject light = Instantiate(Resources.Load("LightType1") as GameObject);// bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab.GetComponentsInChildren<Transform>()[0].gameObject;
         light.transform.name = "LightDemo";
         light = light.transform.Find("Spot Light").gameObject;
@@ -128,7 +163,7 @@ public class UpdateMap : MonoBehaviour
         });
         drn_Location = GameObject.Find("Drn_Location").GetComponent<Dropdown>();
         drn_Location.onValueChanged.AddListener(delegate {
-            if(drn_Location.value == 0)
+            if (drn_Location.value == 0)
                 bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(62.4676991855481, 6.30334069538369));
             else
                 bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(59.809179, 17.7043457));
@@ -142,6 +177,8 @@ public class UpdateMap : MonoBehaviour
             bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(true);
         });
         drn_IESType = GameObject.Find("IESList").GetComponent<Dropdown>();
+        drn_IESType.ClearOptions();
+        drn_IESType.AddOptions(children);
         drn_IESType.onValueChanged.AddListener(delegate {
             ////GameObject light = GameObject.Find("Spot Light");
             ////light.GetComponent<HDAdditionalLightData>().SetCookie(GetIESCookie(drn_IESType.options[drn_IESType.value].text));
@@ -163,7 +200,7 @@ public class UpdateMap : MonoBehaviour
         cbx_Terrian.onValueChanged.AddListener(delegate
         {
             if (cbx_Terrian.isOn)
-            { 
+            {
                 bg_Mapbox.Terrain.SetElevationType(ElevationLayerType.TerrainWithElevation);
                 for (int i = 0; i < lightNodes.Count; i++)
                 {
@@ -205,11 +242,58 @@ public class UpdateMap : MonoBehaviour
             bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(cbx_LightPoints.isOn);
         });
 
-        btnLoad = GameObject.Find("Btn_Load").GetComponent<Button>();
-        btnLoad.onClick.AddListener(delegate { LoadFile(); });
+        btn_Load = GameObject.Find("Btn_Load").GetComponent<Button>();
+        btn_Load.onClick.AddListener(delegate { LoadFile(); });
 
-        btnSave = GameObject.Find("Btn_Save").GetComponent<Button>();
-        btnSave.onClick.AddListener(delegate { SaveFile(); });
+        btn_Save = GameObject.Find("Btn_Save").GetComponent<Button>();
+        btn_Save.onClick.AddListener(delegate { SaveFile(); });
+
+        tab_Overview = GameObject.Find("Tab_Overview").GetComponent<Button>();
+        tab_Overview.onClick.AddListener(delegate { ActivateTab(0); });
+
+        tab_LightObject = GameObject.Find("Tab_LightObject").GetComponent<Button>();
+        tab_LightObject.onClick.AddListener(delegate { ActivateTab(1); });
+
+        txt_LightObjectName = GameObject.Find("Txt_LightObjectName").GetComponent<Text>();
+
+        txt_RotationYValue = GameObject.Find("Txt_RotationYValue").GetComponent<Text>();
+        slr_RotationY = GameObject.Find("Slr_RotationY").GetComponent<Slider>();
+        slr_RotationY.onValueChanged.AddListener(delegate
+        {
+            if (SelectedBuilding != null) { 
+                Vector3 angles = SelectedBuilding.transform.eulerAngles;
+                angles.y = slr_RotationY.value;
+                SelectedBuilding.transform.eulerAngles = angles;
+                txt_RotationYValue.text = angles.y.ToString();
+            }
+        });
+
+        drn_LightIES = GameObject.Find("Drn_LightIES").GetComponent<Dropdown>();
+        drn_LightIES.ClearOptions();
+        drn_LightIES.AddOptions(children);
+        drn_LightIES.onValueChanged.AddListener(delegate {
+            string newIES = drn_LightIES.options[drn_LightIES.value].text;
+            int light_index = dictLightIndex[SelectedBuilding.name];
+            if ((SelectedBuilding != null) && (newIES != lightNodes[light_index].IESfileName))
+            {
+                UnityEngine.Texture ies2DCookie = GetIESCookie(newIES);
+                GameObject light = SelectedBuilding.transform.Find("Spot Light").gameObject;
+                light.GetComponent<HDAdditionalLightData>().SetCookie(ies2DCookie);
+                lightNodes[light_index].IESfileName = newIES;
+            }
+            Debug.Log(SelectedBuilding.name + " ies changed to " + newIES);
+        });
+
+        ActivateTab(0);
+    }
+
+    public void ActivateTab(int tabIndex = 0)
+    {
+        for (int i = 0; i < TabMenuList.Length; i++)
+        {
+            TabMenuList[i].SetActive(false);
+        }
+        TabMenuList[tabIndex].SetActive(true);
     }
 
     public FeatureCollection Can_Deserialize(string filename = "LightPoint1 Lerstadvatnet.geojson")
@@ -272,6 +356,8 @@ public class UpdateMap : MonoBehaviour
             DestroyChildren(LightsCollection.name);
             lightNodes.Clear();
             GeoJSON.Net.Geometry.Point mPoint;
+            dictLightIndex = new Dictionary<string, int>();
+            Dictionary<string, object> dictLightIESCookie = new Dictionary<string, object>();
             // Create nodes if not exist
             for (int i = 0; i < num; i++)
             {
@@ -291,8 +377,17 @@ public class UpdateMap : MonoBehaviour
                     lightObject.transform.position = pos;
                     lightObject.transform.eulerAngles = StrToVector3(fCollection.Features[i].Properties["eulerAngles"] as string);
                     lightObject.transform.localScale = new Vector3(1, 1, 1);
+                    string strIES = fCollection.Features[i].Properties["IESfileName"] as string;
+                    if (!dictLightIESCookie.ContainsKey(strIES))
+                    {
+                        dictLightIESCookie[strIES] = GetIESCookie(strIES);        
+                    }
+                    GameObject light = lightObject.transform.Find("Spot Light").gameObject;
+                    light.GetComponent<HDAdditionalLightData>().SetCookie(dictLightIESCookie[strIES] as UnityEngine.Texture);
+
                     lightNode.obj = lightObject;
                     lightNodes.Add(lightNode);
+                    dictLightIndex.Add(lightObject.transform.name, i);
                 }
             }
             mPoint = fCollection.Features[num].Geometry as GeoJSON.Net.Geometry.Point;
@@ -337,6 +432,7 @@ public class UpdateMap : MonoBehaviour
             props[i] = new Dictionary<string, object>();
             props[i].Add("name", lightNodes[i].name);
             props[i].Add("eulerAngles", lightNodes[i].obj.transform.eulerAngles.ToString()); // after convert the alpha
+            props[i].Add("IESfileName", lightNodes[i].IESfileName);
         }
         props[num] = new Dictionary<string, object>();
         props[num].Add("mapCenter", bg_Mapbox.CenterLatitudeLongitude.ToString());
@@ -476,6 +572,12 @@ public class UpdateMap : MonoBehaviour
             {
                 if (SelectBuilding())
                 {
+                    txt_LightObjectName.text = "Selected: " + SelectedBuilding.name;
+                    if (SelectedBuilding.transform.eulerAngles.y < 0)
+                        slr_RotationY.value = 0;
+                    else
+                        slr_RotationY.value = SelectedBuilding.transform.eulerAngles.y;
+                    txt_RotationYValue.text = slr_RotationY.value.ToString();
                     SelectedFlagCube.SetActive(true);
                     Rotate SelRotate = (Rotate)SelectedFlagCube.GetComponent("Rotate");
                     SelRotate.LabelText = SelectedBuilding.name;
@@ -491,9 +593,6 @@ public class UpdateMap : MonoBehaviour
                 if (IsMoving)
                 {
                     ClearSelectedBuilding();
-                    SelectedBuilding = null;
-                    SelectedFlagCube.SetActive(false);
-                    IsMoving = false;
                 }
             }
             t1 = t2;
@@ -538,6 +637,25 @@ public class UpdateMap : MonoBehaviour
         {
             SelectedBuilding = null;
             SelectedFlagCube.SetActive(false);
+        }
+        IsMoving = false;
+        txt_LightObjectName.text = "No selection";
+        slr_RotationY.value = 0;
+        txt_RotationYValue.text = "";
+    }
+
+    private void TaskOnClick()
+    {
+        var paths = StandaloneFileBrowser.OpenFilePanel("Title", "", "ies", false);
+        if (paths.Length > 0)
+        {
+            for (int i = 0; i < paths.Length; i++)
+            {
+                Debug.Log(paths[i]);
+                FileUtil.MoveFileOrDirectory(paths[i], "Assets/IES folder/");
+            }
+
+            //StartCoroutine(OutputRoutine(new System.Uri(paths[0]).AbsoluteUri));
         }
     }
 }

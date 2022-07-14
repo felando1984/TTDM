@@ -21,6 +21,7 @@ public class Node : ScriptableObject
     public Node[] POIList = null; //List of POIs for risk calculation
     public float[] LeastCostList; //List of costs for different POIs for risk calculation
     public float riskFactor; //riskFactor calculation happens in Graph.cs
+    public string IESfileName;
 
     public int x_index;
     public int z_index;
