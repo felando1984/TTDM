@@ -27,6 +27,9 @@ public class UpdateMap : MonoBehaviour
     private Toggle cbx_Buildings;
     private Toggle cbx_Roads;
     private Toggle cbx_LightPoints;
+    private Button btnLoad;
+    private Button btnSave;
+    private GameObject mainCamera;
     //private GameObjectModifier buildingsModifier;
     private ReplaceFeatureCollectionModifier lightModifier;
     private GameObject LightsCollection;
@@ -38,6 +41,7 @@ public class UpdateMap : MonoBehaviour
     {
         lightNodes = new List<Node>();
         LightsCollection = GameObject.Find("LightsCollection");
+        mainCamera = GameObject.Find("Main Camera");
         //buildingsModifier = ScriptableObject.CreateInstance<BuildingsModifier>();
         //lightModifier = ScriptableObject.CreateInstance<ReplaceFeatureCollectionModifier>();
         // Build 0063
@@ -184,6 +188,12 @@ public class UpdateMap : MonoBehaviour
         cbx_LightPoints.onValueChanged.AddListener(delegate {
             bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(cbx_LightPoints.isOn);
         });
+
+        btnLoad = GameObject.Find("Btn_Load").GetComponent<Button>();
+        btnLoad.onClick.AddListener(delegate { LoadFile(); });
+
+        btnSave = GameObject.Find("Btn_Save").GetComponent<Button>();
+        btnSave.onClick.AddListener(delegate { SaveFile(); });
     }
 
     // Update is called once per frame
@@ -222,9 +232,9 @@ public class UpdateMap : MonoBehaviour
             }
         }
     }
-    public FeatureCollection Can_Deserialize()
+    public FeatureCollection Can_Deserialize(string filename = "LightPoint1 Lerstadvatnet.geojson")
     {
-        var rd = new StreamReader("LightPoint1 Lerstadvatnet.geojson");// ("viktig.Geojson");
+        var rd = new StreamReader(filename);// ("viktig.Geojson");
 
         string json = rd.ReadToEnd();
 
@@ -269,5 +279,170 @@ public class UpdateMap : MonoBehaviour
         string iesFileName = iesFilePath;// Path.GetFileNameWithoutExtension(ctx.assetPath);
 
         return cookieTexture2D;
+    }
+
+    public void LoadFile()
+    {
+        string outputfileName = "1.geojson";
+        FeatureCollection fCollection = Can_Deserialize(outputfileName);
+
+        int num = fCollection.Features.Count - 1;
+        if (num > 0)
+        {
+            DestroyChildren(LightsCollection.name);
+            lightNodes.Clear();
+            GeoJSON.Net.Geometry.Point mPoint;
+            // Create nodes if not exist
+            for (int i = 0; i < num; i++)
+            {
+                mPoint = fCollection.Features[i].Geometry as GeoJSON.Net.Geometry.Point;
+                var coords = mPoint.Coordinates;
+                {
+                    Vector2 latlong;
+                    Vector3 pos;
+                    Node lightNode = new Node();// LightNode
+                    latlong = new Vector2((float)(coords.Latitude), (float)(coords.Longitude));
+                    lightNode.GeoVec = latlong;
+                    pos = latlong.AsUnityPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
+                    GameObject lightObject = Instantiate(Resources.Load("LightType1") as GameObject);
+                    lightObject.transform.name = "LightInfraS_" + i;
+                    lightObject.transform.parent = LightsCollection.transform;
+                    pos.y = bg_Mapbox.QueryElevationInUnityUnitsAt(new Mapbox.Utils.Vector2d(coords.Latitude, coords.Longitude));
+                    lightObject.transform.position = pos;
+                    lightObject.transform.localScale = new Vector3(1, 1, 1);
+                    lightNode.obj = lightObject;
+                    lightNodes.Add(lightNode);
+                }
+            }
+            mPoint = fCollection.Features[num].Geometry as GeoJSON.Net.Geometry.Point;
+            if (mPoint.Coordinates.Latitude == 0)
+            {
+                //string fCollection.Features[num].Properties["mapCenter"];
+                Dictionary<string, object> prop = fCollection.Features[num].Properties;
+                bg_Mapbox.SetCenterLatitudeLongitude(StrToVector2d(prop["mapCenter"] as string));
+                mainCamera.transform.position = StrToVector3(prop["cameraPos"] as string);
+                mainCamera.transform.eulerAngles = StrToVector3(prop["cameraAngles"] as string);
+            }
+        }
+
+        Debug.Log(outputfileName + " loaded");
+        //
+    }
+
+    public void SaveFile()
+    {
+        int num = lightNodes.Count;
+        for (int i = 0; i < num; i++)
+        {
+            // check obj exists or not
+            if((lightNodes[i].obj as UnityEngine.Object) == null)
+            { 
+                lightNodes.RemoveAt(i);
+                i--;
+                num = lightNodes.Count;
+            }
+        }
+            
+        Mapbox.Utils.Vector2d[] g_image = new Mapbox.Utils.Vector2d[num];
+        // feed the array and concat to as a string
+        Dictionary<string, object>[] props = new Dictionary<string, object>[num + 1];
+        for (int i = 0; i < num; i++)
+        {
+            Mapbox.Utils.Vector2d geopos = lightNodes[i].obj.transform.position.GetGeoPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
+            lightNodes[i].GeoVec.x = (float)geopos.x;
+            lightNodes[i].GeoVec.y = (float)geopos.y;
+            
+            g_image[i] = geopos;
+            props[i] = new Dictionary<string, object>();
+            props[i].Add("name", lightNodes[i].name);
+            props[i].Add("eulerAngles", lightNodes[i].obj.transform.eulerAngles.ToString()); // after convert the alpha
+        }
+        props[num] = new Dictionary<string, object>();
+        props[num].Add("mapCenter", bg_Mapbox.CenterLatitudeLongitude.ToString());
+        props[num].Add("cameraPos", mainCamera.transform.position.ToString());
+        props[num].Add("cameraAngles", mainCamera.transform.eulerAngles.ToString());
+        
+        string outputfileName = "1.geojson";
+        SaveToGeojson(outputfileName, props, g_image); //g_edges
+        Debug.Log(outputfileName + " saved");
+        //
+    }
+
+    public void SaveToGeojson(string filename, Dictionary<string, object>[] properties, Mapbox.Utils.Vector2d[] geoimage)
+    {
+        if (geoimage.Length == lightNodes.Count)
+        {
+            var model = new FeatureCollection();
+
+            GeoJSON.Net.Geometry.Point point;
+            for (int i = 0; i < geoimage.Length; i++)
+            {
+                point = new GeoJSON.Net.Geometry.Point(new Position(geoimage[i].x, geoimage[i].y));
+
+                var feature = new Feature(point, properties[i], i.ToString());
+                model.Features.Add(feature);
+            }
+            point = new GeoJSON.Net.Geometry.Point(new Position(0, 0));
+            model.Features.Add(new Feature(point, properties[geoimage.Length], geoimage.Length.ToString()));
+
+            var json = JsonConvert.SerializeObject(model);
+
+            json = json.Replace("\"type\":8", "\"type\":\"FeatureCollection\"");
+            json = json.Replace("\"type\":7", "\"type\":\"Feature\"");
+            json = json.Replace("\"type\":5", "\"type\":\"MultiPolygon\"");
+            json = json.Replace("\"type\":4", "\"type\":\"Polygon\"");
+            json = json.Replace("\"type\":3", "\"type\":\"MultiLineString\"");
+            json = json.Replace("\"type\":0", "\"type\":\"Point\"");
+
+            StreamWriter sw = new StreamWriter(filename);
+            sw.WriteLine(json);
+            sw.Close();
+        }
+    }
+
+    public Mapbox.Utils.Vector2d StrToVector2d(string VStr)
+    {
+        string[] VStrArray = VStr.Split(',');
+        if (VStrArray.Length == 2)
+        {
+            return new Mapbox.Utils.Vector2d(double.Parse(VStrArray[0]), double.Parse(VStrArray[1]));
+        }
+        else
+            return new Mapbox.Utils.Vector2d(0, 0);
+    }
+
+    public Vector3 StrToVector3(string VStr)
+    {
+        string[] VStrArray = Between(VStr, "(", ")").Split(',');
+        if (VStrArray.Length == 3)
+        {
+            return new Vector3(float.Parse(VStrArray[0]), float.Parse(VStrArray[1]), float.Parse(VStrArray[2]));
+        }
+        else
+            return new Vector3(0, 0, 0);
+    }
+
+    public string Between(string STR, string FirstString, string LastString)
+    {
+        string FinalString;
+        int Pos1 = STR.IndexOf(FirstString) + FirstString.Length;
+        int Pos2 = STR.IndexOf(LastString);
+        FinalString = STR.Substring(Pos1, Pos2 - Pos1);
+        return FinalString;
+    }
+
+    public void DestroyChildren(string parentName)
+    {
+        //GameObject parent = GameObject.Find(parentName).gameObject;
+        //GameObject newParent = Instantiate(parent);
+        //newParent.name = parent.name;
+        //Destroy(parent);
+        //return newParent;
+        Transform[] children = GameObject.Find(parentName).GetComponentsInChildren<Transform>();
+        for (int i = 1; i < children.Length; i++)
+        {
+            if (children[i].gameObject != null)
+                Destroy(children[i].gameObject);
+        }
     }
 }
