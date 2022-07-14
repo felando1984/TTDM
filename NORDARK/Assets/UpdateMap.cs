@@ -30,6 +30,13 @@ public class UpdateMap : MonoBehaviour
     private Button btnLoad;
     private Button btnSave;
     private GameObject mainCamera;
+    private double t1;
+    private double t2;
+    private bool IsMoving = false;
+    private GameObject SelectedBuilding;
+    private GameObject SelectedFlagCube = null;
+    private GameObject RefPlane;
+    private bool TestMode = true;
     //private GameObjectModifier buildingsModifier;
     private ReplaceFeatureCollectionModifier lightModifier;
     private GameObject LightsCollection;
@@ -42,6 +49,9 @@ public class UpdateMap : MonoBehaviour
         lightNodes = new List<Node>();
         LightsCollection = GameObject.Find("LightsCollection");
         mainCamera = GameObject.Find("Main Camera");
+        RefPlane = GameObject.Find("BG_White_H");
+        SelectedFlagCube = GameObject.Find("SelectedCube");
+        SelectedFlagCube.SetActive(false);
         //buildingsModifier = ScriptableObject.CreateInstance<BuildingsModifier>();
         //lightModifier = ScriptableObject.CreateInstance<ReplaceFeatureCollectionModifier>();
         // Build 0063
@@ -175,6 +185,12 @@ public class UpdateMap : MonoBehaviour
                     lightNodes[i].obj.transform.position = pos;
                 }
             }
+            if (SelectedBuilding != null)
+            {
+                SelectedFlagCube.transform.position = new Vector3(SelectedBuilding.transform.position.x,
+                    SelectedBuilding.transform.position.y
+                    , SelectedBuilding.transform.position.z);// + new Vector3(0, 30, 0);
+            }
         });
         cbx_Buildings = GameObject.Find("Cbx_Buildings").GetComponent<Toggle>();
         cbx_Buildings.onValueChanged.AddListener(delegate {
@@ -196,42 +212,6 @@ public class UpdateMap : MonoBehaviour
         btnSave.onClick.AddListener(delegate { SaveFile(); });
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        if (Input.anyKeyDown)
-        {
-            foreach (KeyCode keyCode in System.Enum.GetValues(typeof(KeyCode)))
-            {
-                if (Input.GetKeyDown(keyCode))
-                {
-                    //Debug.Log(keyCode.ToString());
-                    switch (keyCode)
-                    {
-                        case KeyCode.F1:
-                            // Help
-                            break;
-                        case KeyCode.F2:
-                            // Hide / show menu
-                            MainMenu.SetActive(!MainMenu.active);
-                            break;
-                        case KeyCode.F3:
-                            // Screenshot
-                            break;
-                        case KeyCode.F4:
-                            //
-                            break;
-                        case KeyCode.F5:
-                            // Compute
-                            break;
-                        case KeyCode.F6:
-                            // Save
-                            break;
-                    }
-                }
-            }
-        }
-    }
     public FeatureCollection Can_Deserialize(string filename = "LightPoint1 Lerstadvatnet.geojson")
     {
         var rd = new StreamReader(filename);// ("viktig.Geojson");
@@ -309,6 +289,7 @@ public class UpdateMap : MonoBehaviour
                     lightObject.transform.parent = LightsCollection.transform;
                     pos.y = bg_Mapbox.QueryElevationInUnityUnitsAt(new Mapbox.Utils.Vector2d(coords.Latitude, coords.Longitude));
                     lightObject.transform.position = pos;
+                    lightObject.transform.eulerAngles = StrToVector3(fCollection.Features[i].Properties["eulerAngles"] as string);
                     lightObject.transform.localScale = new Vector3(1, 1, 1);
                     lightNode.obj = lightObject;
                     lightNodes.Add(lightNode);
@@ -443,6 +424,120 @@ public class UpdateMap : MonoBehaviour
         {
             if (children[i].gameObject != null)
                 Destroy(children[i].gameObject);
+        }
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (Input.anyKeyDown)
+        {
+            foreach (KeyCode keyCode in System.Enum.GetValues(typeof(KeyCode)))
+            {
+                if (Input.GetKeyDown(keyCode))
+                {
+                    //Debug.Log(keyCode.ToString());
+                    switch (keyCode)
+                    {
+                        case KeyCode.F1:
+                            // Help
+                            break;
+                        case KeyCode.F2:
+                            // Hide / show menu
+                            MainMenu.SetActive(!MainMenu.active);
+                            break;
+                        case KeyCode.F3:
+                            // Screenshot
+                            break;
+                        case KeyCode.F4:
+                            //
+                            break;
+                        case KeyCode.F5:
+                            // Compute
+                            break;
+                        case KeyCode.F6:
+                            // Save
+                            break;
+                    }
+                }
+            }
+        }
+        if (Input.GetMouseButtonDown(0))
+        {
+            t2 = Time.realtimeSinceStartup;
+            if (t2 - t1 < 0.5f) //<0.5s, considered double click
+            {
+                if (SelectedBuilding != null)
+                {
+                    IsMoving = true;
+                }
+            }
+            else
+            {
+                if (SelectBuilding())
+                {
+                    SelectedFlagCube.SetActive(true);
+                    Rotate SelRotate = (Rotate)SelectedFlagCube.GetComponent("Rotate");
+                    SelRotate.LabelText = SelectedBuilding.name;
+                    float scale = bg_Mapbox.WorldRelativeScale * 4;
+                    SelectedFlagCube.transform.localScale = new Vector3(scale, scale, scale);
+                    SelectedFlagCube.transform.position = new Vector3(SelectedBuilding.transform.position.x,
+                    SelectedBuilding.transform.position.y
+                    , SelectedBuilding.transform.position.z);// + new Vector3(0, 30, 0);
+                    if (TestMode)
+                        Debug.Log("E006: selected building is " + SelectedBuilding.name);
+                }
+
+                if (IsMoving)
+                {
+                    ClearSelectedBuilding();
+                    SelectedBuilding = null;
+                    SelectedFlagCube.SetActive(false);
+                    IsMoving = false;
+                }
+            }
+            t1 = t2;
+        }
+        if ((SelectedBuilding != null) && (IsMoving))
+        {
+            Vector3 posPlane = RefPlane.transform.position;
+            posPlane.y = SelectedBuilding.transform.position.y;
+            RefPlane.transform.position = posPlane;
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit2 = new RaycastHit();
+            if (Physics.Raycast(ray, out hit2, 10000, 1 << 2))
+            {
+                Mapbox.Utils.Vector2d geopos = hit2.point.GetGeoPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
+                Vector3 pos = SelectedBuilding.transform.position;
+                pos.x = hit2.point.x;
+                pos.z = hit2.point.z;
+                pos.y = bg_Mapbox.QueryElevationInUnityUnitsAt(geopos);
+
+                SelectedBuilding.transform.position = pos;
+                SelectedFlagCube.transform.position = pos;
+                Debug.Log(pos.ToString());
+            }
+        }
+    }
+    public bool SelectBuilding()
+    {
+        RaycastHit hitInfo = new RaycastHit();
+        bool hit = Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hitInfo, 10000);
+        if (hit)
+        {
+            SelectedBuilding = GameObject.Find(hitInfo.collider.name);
+            return true;
+        }
+        else
+            return false;
+    }
+
+    void ClearSelectedBuilding()
+    {
+        if (SelectedBuilding != null)
+        {
+            SelectedBuilding = null;
+            SelectedFlagCube.SetActive(false);
         }
     }
 }
