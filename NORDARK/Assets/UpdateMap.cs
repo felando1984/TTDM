@@ -29,20 +29,28 @@ public class UpdateMap : MonoBehaviour
     private Toggle cbx_LightPoints;
     //private GameObjectModifier buildingsModifier;
     private ReplaceFeatureCollectionModifier lightModifier;
+    private GameObject LightsCollection;
+    List<Node> lightNodes;
     string path = @"D:\Documents\GitHub\Ashkan\HDRP\Assets\";
 
     // Start is called before the first frame update
     void Start()
     {
+        lightNodes = new List<Node>();
+        LightsCollection = GameObject.Find("LightsCollection");
         //buildingsModifier = ScriptableObject.CreateInstance<BuildingsModifier>();
         //lightModifier = ScriptableObject.CreateInstance<ReplaceFeatureCollectionModifier>();
         // Build 0063
         bg_Mapbox = GameObject.Find("BG_Mapbox").GetComponent<AbstractMap>();
+        //bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(62.4669465500501, 6.29516909238363));
+        //bg_Mapbox.SetZoom(17f);
         bg_Mapbox.SetCenterLatitudeLongitude(new Mapbox.Utils.Vector2d(62.4676991855481, 6.30334069538369));
-        bg_Mapbox.SetZoom(17.45f);
+        bg_Mapbox.SetZoom(17f);
+        //bg_Mapbox.SetZoom(17.45f);
         bg_Mapbox.UpdateMap();
         //62.4676991855481, 6.30334069538369
         //17.45
+        LightsCollection.transform.localScale = bg_Mapbox.transform.localScale;
 
         initGUIMenu();
         // Load Geojson
@@ -50,7 +58,7 @@ public class UpdateMap : MonoBehaviour
         string[] layer_coords = bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).coordinates;
         layer_coords = new string[fCollection.Features.Count];
         // Create nodes if not exist
-        for (int i = 0; i < fCollection.Features.Count; i++)
+        for (int i = 0; i < fCollection.Features.Count; i++)//i < 2; i++)//
         {
             GeoJSON.Net.Geometry.Point mPoint = fCollection.Features[i].Geometry as GeoJSON.Net.Geometry.Point;
             var coords = mPoint.Coordinates;
@@ -58,13 +66,20 @@ public class UpdateMap : MonoBehaviour
                 var index = 0;
                 Vector2 latlong;
                 Vector3 pos;
-                Node nodeX;
+                Node lightNode = new Node();// LightNode
                 latlong = new Vector2((float)(coords.Latitude), (float)(coords.Longitude));
+                lightNode.GeoVec = latlong;
                 layer_coords[i] = coords.Latitude.ToString() + ", " + coords.Longitude.ToString();
                 pos = latlong.AsUnityPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
-                //// Build 0024, auto adjust to closest nodes
-                //Node nodeR = Node.Create<Node>("node" + graph.RawNodes.Count.ToString(), pos);
-                //graph.AddRawNode(nodeR);
+                GameObject lightObject = Instantiate(Resources.Load("LightType1") as GameObject);
+                lightObject.transform.name = "LightInfraS_" + i;
+                lightObject.transform.parent = LightsCollection.transform;
+                pos.y = bg_Mapbox.QueryElevationInUnityUnitsAt(new Mapbox.Utils.Vector2d(coords.Latitude, coords.Longitude));
+                //pos.y = (float)coords.Altitude * bg_Mapbox.WorldRelativeScale;
+                lightObject.transform.position = pos;
+                lightObject.transform.localScale = new Vector3(1, 1, 1);
+                lightNode.obj = lightObject;
+                lightNodes.Add(lightNode);
             }
             //fCollection.Features[i].Geometry as GeoJSON.Net.Geometry.LineString;
             //var coords = fCollection.Features[i].Geometry.Coordinates[0].Coordinates;
@@ -114,19 +129,48 @@ public class UpdateMap : MonoBehaviour
         });
         drn_IESType = GameObject.Find("IESList").GetComponent<Dropdown>();
         drn_IESType.onValueChanged.AddListener(delegate {
-            //GameObject light = GameObject.Find("Spot Light");
+            ////GameObject light = GameObject.Find("Spot Light");
+            ////light.GetComponent<HDAdditionalLightData>().SetCookie(GetIESCookie(drn_IESType.options[drn_IESType.value].text));
+            ////Debug.Log("change to" + drn_IESType.options[drn_IESType.value].text);
+            //light = (Resources.Load("LightType1") as GameObject).transform.Find("Spot Light").gameObject;
+            ////bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab.transform.Find("Spot Light").gameObject;
             //light.GetComponent<HDAdditionalLightData>().SetCookie(GetIESCookie(drn_IESType.options[drn_IESType.value].text));
             //Debug.Log("change to" + drn_IESType.options[drn_IESType.value].text);
-            
-            light.GetComponent<HDAdditionalLightData>().SetCookie(GetIESCookie(drn_IESType.options[drn_IESType.value].text));
+
+            UnityEngine.Texture ies2DCookie = GetIESCookie(drn_IESType.options[drn_IESType.value].text);
+            for (int i = 0; i < lightNodes.Count; i++)
+            {
+                GameObject light = lightNodes[i].obj.transform.Find("Spot Light").gameObject;
+                light.GetComponent<HDAdditionalLightData>().SetCookie(ies2DCookie);
+            }
             Debug.Log("change to" + drn_IESType.options[drn_IESType.value].text);
         });
         cbx_Terrian = GameObject.Find("Cbx_Terrian").GetComponent<Toggle>();
-        cbx_Terrian.onValueChanged.AddListener(delegate {
+        cbx_Terrian.onValueChanged.AddListener(delegate
+        {
             if (cbx_Terrian.isOn)
+            { 
                 bg_Mapbox.Terrain.SetElevationType(ElevationLayerType.TerrainWithElevation);
+                for (int i = 0; i < lightNodes.Count; i++)
+                {
+                    Vector2 latlong = lightNodes[i].GeoVec;
+                    Vector3 pos = latlong.AsUnityPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
+                    pos.y = bg_Mapbox.QueryElevationInUnityUnitsAt(new Mapbox.Utils.Vector2d(latlong.x, latlong.y));
+                    //pos.y = (float)coords.Altitude * bg_Mapbox.WorldRelativeScale;
+                    lightNodes[i].obj.transform.position = pos;
+                }
+            }
             else
+            {
                 bg_Mapbox.Terrain.SetElevationType(ElevationLayerType.FlatTerrain);
+                for (int i = 0; i < lightNodes.Count; i++)
+                {
+                    Vector3 pos = lightNodes[i].obj.transform.position;
+                    pos.y = 0;
+                    //pos.y = (float)coords.Altitude * bg_Mapbox.WorldRelativeScale;
+                    lightNodes[i].obj.transform.position = pos;
+                }
+            }
         });
         cbx_Buildings = GameObject.Find("Cbx_Buildings").GetComponent<Toggle>();
         cbx_Buildings.onValueChanged.AddListener(delegate {
