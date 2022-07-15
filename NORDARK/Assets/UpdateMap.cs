@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Mapbox.Unity.Utilities;
@@ -39,12 +40,16 @@ public class UpdateMap : MonoBehaviour
     private GameObject RefPlane;
     private Button tab_Overview;
     private Button tab_LightObject;
+    private Button tab_Camera;
     private GameObject[] TabMenuList;
     private Slider slr_RotationY;
     private Text txt_RotationYValue;
     private Text txt_LightObjectName;
     private Dropdown drn_LightIES;
     private Button btn_uploadIES;
+    private Dropdown drn_Camera;
+    private Button btn_ResetCamera;
+    private Button btn_UpdateCamera;
 
     private string IESFolderPath;
     private DirectoryInfo IESFolder;
@@ -54,7 +59,9 @@ public class UpdateMap : MonoBehaviour
     //private GameObjectModifier buildingsModifier;
     private ReplaceFeatureCollectionModifier lightModifier;
     private GameObject LightsCollection;
+    private GameObject CameraCollection;
     private Dictionary<string, int> dictLightIndex;
+    private Dictionary<string, GameObject> dictCamera;
     List<Node> lightNodes;
     string path = @"D:\Documents\GitHub\Ashkan\HDRP\Assets\";
 
@@ -63,13 +70,15 @@ public class UpdateMap : MonoBehaviour
     {
         lightNodes = new List<Node>();
         LightsCollection = GameObject.Find("LightsCollection");
+        CameraCollection = GameObject.Find("CameraCollection");
         mainCamera = GameObject.Find("Main Camera");
         RefPlane = GameObject.Find("BG_White_H");
         SelectedFlagCube = GameObject.Find("SelectedCube");
-        TabMenuList = new GameObject[2];
+        TabMenuList = new GameObject[3];
         TabMenuList[0] = GameObject.Find("LeftMenu");
         TabMenuList[1] = GameObject.Find("TabLightObject");
-        
+        TabMenuList[2] = GameObject.Find("TabCamera");
+
         //buildingsModifier = ScriptableObject.CreateInstance<BuildingsModifier>();
         //lightModifier = ScriptableObject.CreateInstance<ReplaceFeatureCollectionModifier>();
         // Build 0063
@@ -92,6 +101,18 @@ public class UpdateMap : MonoBehaviour
         string[] layer_coords = bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).coordinates;
         layer_coords = new string[fCollection.Features.Count];
         dictLightIndex= new Dictionary<string, int>();
+        dictCamera = new Dictionary<string, GameObject>();
+        for (int i = 0; i < drn_Camera.options.Count; i++)
+        {
+            GameObject newCam = new GameObject();
+            newCam.transform.position = mainCamera.transform.position;
+            newCam.transform.eulerAngles = mainCamera.transform.eulerAngles;
+            newCam.transform.parent = CameraCollection.transform;
+            string strCam = drn_Camera.options[i].text;
+            newCam.name = strCam;
+            dictCamera.Add(strCam, newCam);
+        }
+
         // Create nodes if not exist
         for (int i = 0; i < fCollection.Features.Count; i++)//i < 2; i++)//
         {
@@ -254,6 +275,9 @@ public class UpdateMap : MonoBehaviour
         tab_LightObject = GameObject.Find("Tab_LightObject").GetComponent<Button>();
         tab_LightObject.onClick.AddListener(delegate { ActivateTab(1); });
 
+        tab_Camera = GameObject.Find("Tab_Camera").GetComponent<Button>();
+        tab_Camera.onClick.AddListener(delegate { ActivateTab(2); });
+
         txt_LightObjectName = GameObject.Find("Txt_LightObjectName").GetComponent<Text>();
 
         txt_RotationYValue = GameObject.Find("Txt_RotationYValue").GetComponent<Text>();
@@ -284,6 +308,15 @@ public class UpdateMap : MonoBehaviour
             Debug.Log(SelectedBuilding.name + " ies changed to " + newIES);
         });
 
+        drn_Camera = GameObject.Find("Drn_Camera").GetComponent<Dropdown>();
+        drn_Camera.onValueChanged.AddListener(delegate { ResetCamera();});
+
+        btn_ResetCamera = GameObject.Find("Btn_ResetCamera").GetComponent<Button>();
+        btn_ResetCamera.onClick.AddListener(delegate { ResetCamera(); });
+
+        btn_UpdateCamera = GameObject.Find("Btn_UpdateCamera").GetComponent<Button>();
+        btn_UpdateCamera.onClick.AddListener(delegate { UpdateCamera(); });
+
         ActivateTab(0);
     }
 
@@ -303,6 +336,8 @@ public class UpdateMap : MonoBehaviour
         string json = rd.ReadToEnd();
 
         var featureCollection = JsonConvert.DeserializeObject<FeatureCollection>(json);
+
+        rd.Close();
 
         return featureCollection;
     }
@@ -348,6 +383,14 @@ public class UpdateMap : MonoBehaviour
     public void LoadFile()
     {
         string outputfileName = "1.geojson";
+
+        var paths = StandaloneFileBrowser.OpenFilePanel("Select NORDARK scene file", @"D:\Norway\Master Thesis\TTDM\NORDARK\SceneExample", "geojson", false);
+        if (paths.Length > 0)
+        {
+            outputfileName = paths[0];
+        }
+        Debug.Log("E001: Load scene file <" + outputfileName + ">");
+
         FeatureCollection fCollection = Can_Deserialize(outputfileName);
 
         int num = fCollection.Features.Count - 1;
@@ -384,6 +427,7 @@ public class UpdateMap : MonoBehaviour
                     }
                     GameObject light = lightObject.transform.Find("Spot Light").gameObject;
                     light.GetComponent<HDAdditionalLightData>().SetCookie(dictLightIESCookie[strIES] as UnityEngine.Texture);
+                    lightNode.IESfileName = strIES;
 
                     lightNode.obj = lightObject;
                     lightNodes.Add(lightNode);
@@ -398,10 +442,32 @@ public class UpdateMap : MonoBehaviour
                 bg_Mapbox.SetCenterLatitudeLongitude(StrToVector2d(prop["mapCenter"] as string));
                 mainCamera.transform.position = StrToVector3(prop["cameraPos"] as string);
                 mainCamera.transform.eulerAngles = StrToVector3(prop["cameraAngles"] as string);
+
+                //
+                string[] strCameras = (prop["cameraList"] as string).Split('%');
+                if (strCameras.Length > 0)
+                {
+                    DestroyChildren(CameraCollection.name);
+                    dictCamera.Clear();
+                    for(int i = 0; i < strCameras.Length; i++)
+                    {
+                        string[] strCamera = strCameras[i].Split('&');
+                        if (strCamera.Length == 3)
+                        {
+                            GameObject newCam = new GameObject();
+                            newCam.transform.position = StrToVector3(strCamera[1]);
+                            newCam.transform.eulerAngles = StrToVector3(strCamera[2]);
+                            newCam.transform.parent = CameraCollection.transform;
+                            string strCam = strCamera[0];
+                            newCam.name = strCam;
+                            dictCamera.Add(strCam, newCam);
+                        }
+                    }
+                }
             }
         }
 
-        Debug.Log(outputfileName + " loaded");
+        Debug.Log("E003: Load scene file successfully");
         //
     }
 
@@ -438,10 +504,29 @@ public class UpdateMap : MonoBehaviour
         props[num].Add("mapCenter", bg_Mapbox.CenterLatitudeLongitude.ToString());
         props[num].Add("cameraPos", mainCamera.transform.position.ToString());
         props[num].Add("cameraAngles", mainCamera.transform.eulerAngles.ToString());
-        
+        //
+        string[] strCameras = new string[dictCamera.Count];
+        int j = 0;
+        foreach (var i in dictCamera.Keys)
+        {
+            string[] strCamera = new string[3];
+            strCamera[0] = i;
+            strCamera[1] = dictCamera[i].transform.position.ToString();
+            strCamera[2] = dictCamera[i].transform.eulerAngles.ToString();
+            strCameras[j] = String.Join("&", strCamera);
+            j++;
+        }
+        props[num].Add("cameraList", String.Join("%", strCameras));
         string outputfileName = "1.geojson";
+
+        var filename = StandaloneFileBrowser.SaveFilePanel("Select NORDARK scene file", @"D:\Norway\Master Thesis\TTDM\NORDARK\SceneExample", "Ex00_Default", "geojson");
+        if (filename != "")
+        {
+            outputfileName = filename;
+        }
+
         SaveToGeojson(outputfileName, props, g_image); //g_edges
-        Debug.Log(outputfileName + " saved");
+        Debug.Log("E002: Save scene file as <" + outputfileName + "> successfully");
         //
     }
 
@@ -554,6 +639,30 @@ public class UpdateMap : MonoBehaviour
                         case KeyCode.F6:
                             // Save
                             break;
+                        case KeyCode.Delete:
+                            if (SelectedBuilding != null)
+                            {
+                                Destroy(SelectedBuilding);
+                                if (TestMode)
+                                    Debug.Log("E007: selected building " + SelectedBuilding.name + " is deleted");
+                                ClearSelectedBuilding();
+                            }
+                            break;
+                        case KeyCode.M:
+                            if (SelectedBuilding != null)
+                            {
+                                if (IsMoving)
+                                {
+                                    ClearSelectedBuilding();
+                                }
+                                else
+                                    IsMoving = true;
+                            }
+                            else
+                            {
+                                IsMoving = false;
+                            }
+                            break;
                     }
                 }
             }
@@ -578,6 +687,12 @@ public class UpdateMap : MonoBehaviour
                     else
                         slr_RotationY.value = SelectedBuilding.transform.eulerAngles.y;
                     txt_RotationYValue.text = slr_RotationY.value.ToString();
+                    int light_index = dictLightIndex[SelectedBuilding.name];
+                    string iesFileName = lightNodes[light_index].IESfileName;
+                    if (children.Contains(iesFileName))
+                        drn_LightIES.value = children.FindIndex(x => x.Contains(iesFileName));
+                    else
+                        drn_LightIES.captionText.text = iesFileName;
                     SelectedFlagCube.SetActive(true);
                     Rotate SelRotate = (Rotate)SelectedFlagCube.GetComponent("Rotate");
                     SelRotate.LabelText = SelectedBuilding.name;
@@ -597,6 +712,11 @@ public class UpdateMap : MonoBehaviour
             }
             t1 = t2;
         }
+        else if (Input.GetMouseButtonDown(1))
+        {
+            ClearSelectedBuilding();
+        }
+
         if ((SelectedBuilding != null) && (IsMoving))
         {
             Vector3 posPlane = RefPlane.transform.position;
@@ -656,6 +776,28 @@ public class UpdateMap : MonoBehaviour
             }
 
             //StartCoroutine(OutputRoutine(new System.Uri(paths[0]).AbsoluteUri));
+        }
+    }
+
+    private void ResetCamera()
+    {
+        string strCamera = drn_Camera.options[drn_Camera.value].text;
+        if (dictCamera.ContainsKey(strCamera))
+        {
+            mainCamera.transform.position = dictCamera[strCamera].transform.position;
+            mainCamera.transform.eulerAngles = dictCamera[strCamera].transform.eulerAngles;
+            Debug.Log("E008: Reset main camera to <" + strCamera + ">");
+        }
+    }
+
+    private void UpdateCamera()
+    {
+        string strCamera = drn_Camera.options[drn_Camera.value].text;
+        if (dictCamera.ContainsKey(strCamera))
+        {
+            dictCamera[strCamera].transform.position = mainCamera.transform.position;
+            dictCamera[strCamera].transform.eulerAngles = mainCamera.transform.eulerAngles;
+            Debug.Log("E009: Update <" + strCamera + "> by main camera");
         }
     }
 }
