@@ -47,6 +47,8 @@ public class UpdateMap : MonoBehaviour
     private Text txt_LightObjectName;
     private Dropdown drn_LightIES;
     private Button btn_uploadIES;
+    private Button btn_Move;
+    private Button btn_Delete;
     private Dropdown drn_Camera;
     private Button btn_ResetCamera;
     private Button btn_UpdateCamera;
@@ -307,6 +309,12 @@ public class UpdateMap : MonoBehaviour
             }
             Debug.Log(SelectedBuilding.name + " ies changed to " + newIES);
         });
+
+        btn_Move = GameObject.Find("Btn_Move").GetComponent<Button>();
+        btn_Move.onClick.AddListener(delegate { MoveObject(); });
+
+        btn_Delete = GameObject.Find("Btn_Delete").GetComponent<Button>();
+        btn_Delete.onClick.AddListener(delegate { DeleteObject(); });
 
         drn_Camera = GameObject.Find("Drn_Camera").GetComponent<Dropdown>();
         drn_Camera.onValueChanged.AddListener(delegate { ResetCamera();});
@@ -640,28 +648,13 @@ public class UpdateMap : MonoBehaviour
                             // Save
                             break;
                         case KeyCode.Delete:
-                            if (SelectedBuilding != null)
-                            {
-                                Destroy(SelectedBuilding);
-                                if (TestMode)
-                                    Debug.Log("E007: selected building " + SelectedBuilding.name + " is deleted");
-                                ClearSelectedBuilding();
-                            }
+                            DeleteObject();
                             break;
                         case KeyCode.M:
-                            if (SelectedBuilding != null)
-                            {
-                                if (IsMoving)
-                                {
-                                    ClearSelectedBuilding();
-                                }
-                                else
-                                    IsMoving = true;
-                            }
-                            else
-                            {
-                                IsMoving = false;
-                            }
+                            MoveObject();
+                            break;
+                        case KeyCode.Insert:
+                            InsertObject();
                             break;
                     }
                 }
@@ -738,6 +731,61 @@ public class UpdateMap : MonoBehaviour
             }
         }
     }
+
+    public void DeleteObject()
+    {
+        if (SelectedBuilding != null)
+        {
+            Destroy(SelectedBuilding);
+            if (TestMode)
+                Debug.Log("E007: selected building " + SelectedBuilding.name + " is deleted");
+            ClearSelectedBuilding();
+        }
+    }
+    public void MoveObject() 
+    {
+        if (SelectedBuilding != null)
+        {
+            if (IsMoving)
+            {
+                ClearSelectedBuilding();
+            }
+            else
+                IsMoving = true;
+        }
+        else
+        {
+            IsMoving = false;
+        }
+    }
+
+    public void InsertObject()
+    {
+        GameObject cloneObj;
+        if (SelectedBuilding != null)
+        {
+            cloneObj = Instantiate(SelectedBuilding) as GameObject;
+            cloneObj.name = "LightInfraS_" + lightNodes.Count;
+            cloneObj.transform.parent = LightsCollection.transform;
+
+            Node lightNode = new Node();// LightNode
+            lightNode.GeoVec = lightNodes[lightNodes.Count - 1].GeoVec;
+            lightNode.obj = cloneObj;
+            lightNode.IESfileName = lightNodes[lightNodes.Count - 1].IESfileName;
+            lightNodes.Add(lightNode);
+            dictLightIndex.Add(cloneObj.transform.name, lightNodes.Count - 1);
+
+            ClearSelectedBuilding();
+            SelectedBuilding = cloneObj;
+            SelectedFlagCube.SetActive(true);
+            IsMoving = true;
+        }
+        else
+        {
+            //CreateByPredefined = true;
+        }
+    }
+
     public bool SelectBuilding()
     {
         RaycastHit hitInfo = new RaycastHit();
