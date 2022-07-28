@@ -22,6 +22,7 @@ public class Node : ScriptableObject
     public float[] LeastCostList; //List of costs for different POIs for risk calculation
     public float riskFactor; //riskFactor calculation happens in Graph.cs
     public string IESfileName;
+    public string LightPrefabName;
 
     public int x_index;
     public int z_index;

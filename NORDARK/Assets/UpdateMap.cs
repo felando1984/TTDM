@@ -55,7 +55,12 @@ public class UpdateMap : MonoBehaviour
 
     private string IESFolderPath;
     private DirectoryInfo IESFolder;
-    private List<string> children = new List<string>();
+    private List<string> IESList = new List<string>();
+
+    private string LightPrefabFolderPath;
+    private DirectoryInfo LightPrefabFolder;
+    private List<string> LightPrefabList = new List<string>();
+    private string strStreetLightLib = "StreetLightLib";
 
     private bool TestMode = true;
     //private GameObjectModifier buildingsModifier;
@@ -63,6 +68,7 @@ public class UpdateMap : MonoBehaviour
     private GameObject LightsCollection;
     private GameObject CameraCollection;
     private Dictionary<string, int> dictLightIndex;
+    private Dictionary<string, object> dictLightIESCookie;
     private Dictionary<string, GameObject> dictCamera;
     List<Node> lightNodes;
     string path = @"D:\Documents\GitHub\Ashkan\HDRP\Assets\";
@@ -129,7 +135,7 @@ public class UpdateMap : MonoBehaviour
                 lightNode.GeoVec = latlong;
                 layer_coords[i] = coords.Latitude.ToString() + ", " + coords.Longitude.ToString();
                 pos = latlong.AsUnityPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
-                GameObject lightObject = Instantiate(Resources.Load("LightType1") as GameObject);
+                GameObject lightObject = Instantiate(Resources.Load(strStreetLightLib + "/" + LightPrefabList[0]) as GameObject);
                 lightObject.transform.name = "LightInfraS_" + i;
                 lightObject.transform.parent = LightsCollection.transform;
                 pos.y = bg_Mapbox.QueryElevationInUnityUnitsAt(new Mapbox.Utils.Vector2d(coords.Latitude, coords.Longitude));
@@ -137,7 +143,8 @@ public class UpdateMap : MonoBehaviour
                 lightObject.transform.position = pos;
                 lightObject.transform.localScale = new Vector3(1, 1, 1);
                 lightNode.obj = lightObject;
-                lightNode.IESfileName = children[0];
+                lightNode.IESfileName = IESList[0];
+                lightNode.LightPrefabName = LightPrefabList[0];//"LightType1";
                 lightNodes.Add(lightNode);
                 dictLightIndex.Add(lightObject.transform.name, i);
             }
@@ -169,15 +176,25 @@ public class UpdateMap : MonoBehaviour
 
         IESFolderPath = "Assets/IES folder";
         IESFolder = new DirectoryInfo(IESFolderPath);
-
+        dictLightIESCookie = new Dictionary<string, object>();
         foreach (var file in IESFolder.GetFiles("*.ies"))
         {
-            children.Add(file.Name);
+            IESList.Add(file.Name);
+            dictLightIESCookie[file.Name] = GetIESCookie(file.Name);
         }
 
-        GameObject light = Instantiate(Resources.Load("LightType1") as GameObject);// bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab.GetComponentsInChildren<Transform>()[0].gameObject;
+        LightPrefabFolderPath = "Assets/Resources/" + strStreetLightLib;
+        LightPrefabFolder = new DirectoryInfo(LightPrefabFolderPath);
+
+        foreach (var file in LightPrefabFolder.GetFiles("*.prefab"))
+        {
+            LightPrefabList.Add(GetFileName(file.Name));
+        }
+
+        GameObject light = Instantiate(Resources.Load(strStreetLightLib + "/"+ LightPrefabList[0]) as GameObject);//Instantiate(Resources.Load("LightType1") as GameObject);// bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab.GetComponentsInChildren<Transform>()[0].gameObject;
         light.transform.name = "LightDemo";
         light = light.transform.Find("Spot Light").gameObject;
+        GameObject.Find("LightDemo").SetActive(false);
 
         MainMenu = GameObject.Find("Canvas_Mainmenu");
         drn_MapStyle = GameObject.Find("Drn_MapStyle").GetComponent<Dropdown>();
@@ -193,15 +210,42 @@ public class UpdateMap : MonoBehaviour
             bg_Mapbox.UpdateMap();
         });
         drn_LightType = GameObject.Find("Drn_LightType").GetComponent<Dropdown>();
+        drn_LightType.ClearOptions();
+        drn_LightType.AddOptions(LightPrefabList);
         drn_LightType.onValueChanged.AddListener(delegate {
-            bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(false);
-            string path = @"Assets/Prefabs/StreetLightsPack/";
-            bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab = Resources.Load(drn_LightType.options[drn_LightType.value].text) as GameObject;
-            bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(true);
+            string newLightType = drn_LightType.options[drn_LightType.value].text;
+            int light_index = dictLightIndex[SelectedBuilding.name];
+            GameObject old_lightObject = lightNodes[light_index].obj;
+            if ((SelectedBuilding != null) && (newLightType != lightNodes[light_index].LightPrefabName))
+            {
+                GameObject lightObject = Instantiate(Resources.Load(strStreetLightLib + "/" + newLightType) as GameObject);
+                lightObject.transform.name = old_lightObject.transform.name;
+                lightObject.transform.parent = old_lightObject.transform.parent;
+                lightObject.transform.position = old_lightObject.transform.position;
+                lightObject.transform.eulerAngles = old_lightObject.transform.eulerAngles;
+                GameObject light = lightObject.transform.Find("Spot Light").gameObject;
+                light.GetComponent<HDAdditionalLightData>().SetCookie(dictLightIESCookie[lightNodes[light_index].IESfileName] as UnityEngine.Texture);
+
+
+                //UnityEngine.Texture ies2DCookie = GetIESCookie(newIES);
+                //GameObject light = SelectedBuilding.transform.Find("Spot Light").gameObject;
+                //light.GetComponent<HDAdditionalLightData>().SetCookie(ies2DCookie);
+                Destroy(old_lightObject);
+                lightNodes[light_index].obj = lightObject;
+                lightNodes[light_index].LightPrefabName = newLightType;
+                SelectedBuilding = lightObject;
+            }
+            Debug.Log("E005: " + SelectedBuilding.name + " light prefab model changed to " + newLightType);
         });
+        //drn_LightType.onValueChanged.AddListener(delegate {
+        //    bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(false);
+        //    string path = @"Assets/Prefabs/StreetLightsPack/";
+        //    bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).spawnPrefabOptions.prefab = Resources.Load(drn_LightType.options[drn_LightType.value].text) as GameObject;
+        //    bg_Mapbox.VectorData.GetPointsOfInterestSubLayerAtIndex(0).SetActive(true);
+        //});
         drn_IESType = GameObject.Find("IESList").GetComponent<Dropdown>();
         drn_IESType.ClearOptions();
-        drn_IESType.AddOptions(children);
+        drn_IESType.AddOptions(IESList);
         drn_IESType.onValueChanged.AddListener(delegate {
             ////GameObject light = GameObject.Find("Spot Light");
             ////light.GetComponent<HDAdditionalLightData>().SetCookie(GetIESCookie(drn_IESType.options[drn_IESType.value].text));
@@ -217,7 +261,7 @@ public class UpdateMap : MonoBehaviour
                 GameObject light = lightNodes[i].obj.transform.Find("Spot Light").gameObject;
                 light.GetComponent<HDAdditionalLightData>().SetCookie(ies2DCookie);
             }
-            Debug.Log("change to" + drn_IESType.options[drn_IESType.value].text);
+            Debug.Log("E004: " + SelectedBuilding.name + " change to" + drn_IESType.options[drn_IESType.value].text);
         });
         cbx_Terrian = GameObject.Find("Cbx_Terrian").GetComponent<Toggle>();
         cbx_Terrian.onValueChanged.AddListener(delegate
@@ -296,7 +340,7 @@ public class UpdateMap : MonoBehaviour
 
         drn_LightIES = GameObject.Find("Drn_LightIES").GetComponent<Dropdown>();
         drn_LightIES.ClearOptions();
-        drn_LightIES.AddOptions(children);
+        drn_LightIES.AddOptions(IESList);
         drn_LightIES.onValueChanged.AddListener(delegate {
             string newIES = drn_LightIES.options[drn_LightIES.value].text;
             int light_index = dictLightIndex[SelectedBuilding.name];
@@ -408,7 +452,7 @@ public class UpdateMap : MonoBehaviour
             lightNodes.Clear();
             GeoJSON.Net.Geometry.Point mPoint;
             dictLightIndex = new Dictionary<string, int>();
-            Dictionary<string, object> dictLightIESCookie = new Dictionary<string, object>();
+            dictLightIESCookie = new Dictionary<string, object>();
             // Create nodes if not exist
             for (int i = 0; i < num; i++)
             {
@@ -417,11 +461,17 @@ public class UpdateMap : MonoBehaviour
                 {
                     Vector2 latlong;
                     Vector3 pos;
+                    string strLightPrefabName;
                     Node lightNode = new Node();// LightNode
                     latlong = new Vector2((float)(coords.Latitude), (float)(coords.Longitude));
                     lightNode.GeoVec = latlong;
                     pos = latlong.AsUnityPosition(bg_Mapbox.CenterMercator, bg_Mapbox.WorldRelativeScale);
-                    GameObject lightObject = Instantiate(Resources.Load("LightType1") as GameObject);
+                    //GameObject lightObject = Instantiate(Resources.Load("LightType1") as GameObject);
+                    if (!fCollection.Features[i].Properties.ContainsKey("LightPrefabName"))
+                        strLightPrefabName = LightPrefabList[0];
+                    else
+                        strLightPrefabName = fCollection.Features[i].Properties["LightPrefabName"] as string;
+                    GameObject lightObject = Instantiate(Resources.Load(strStreetLightLib + "/" + strLightPrefabName) as GameObject);
                     lightObject.transform.name = "LightInfraS_" + i;
                     lightObject.transform.parent = LightsCollection.transform;
                     pos.y = bg_Mapbox.QueryElevationInUnityUnitsAt(new Mapbox.Utils.Vector2d(coords.Latitude, coords.Longitude));
@@ -436,6 +486,7 @@ public class UpdateMap : MonoBehaviour
                     GameObject light = lightObject.transform.Find("Spot Light").gameObject;
                     light.GetComponent<HDAdditionalLightData>().SetCookie(dictLightIESCookie[strIES] as UnityEngine.Texture);
                     lightNode.IESfileName = strIES;
+                    lightNode.LightPrefabName = strLightPrefabName;
 
                     lightNode.obj = lightObject;
                     lightNodes.Add(lightNode);
@@ -507,6 +558,7 @@ public class UpdateMap : MonoBehaviour
             props[i].Add("name", lightNodes[i].name);
             props[i].Add("eulerAngles", lightNodes[i].obj.transform.eulerAngles.ToString()); // after convert the alpha
             props[i].Add("IESfileName", lightNodes[i].IESfileName);
+            props[i].Add("LightPrefabName", lightNodes[i].LightPrefabName);
         }
         props[num] = new Dictionary<string, object>();
         props[num].Add("mapCenter", bg_Mapbox.CenterLatitudeLongitude.ToString());
@@ -601,6 +653,13 @@ public class UpdateMap : MonoBehaviour
         return FinalString;
     }
 
+    public string GetFileName(string STR)
+    {
+        string FinalString;
+        FinalString = STR.Substring(0, STR.IndexOf('.'));
+        return FinalString;
+    }
+
     public void DestroyChildren(string parentName)
     {
         //GameObject parent = GameObject.Find(parentName).gameObject;
@@ -682,8 +741,8 @@ public class UpdateMap : MonoBehaviour
                     txt_RotationYValue.text = slr_RotationY.value.ToString();
                     int light_index = dictLightIndex[SelectedBuilding.name];
                     string iesFileName = lightNodes[light_index].IESfileName;
-                    if (children.Contains(iesFileName))
-                        drn_LightIES.value = children.FindIndex(x => x.Contains(iesFileName));
+                    if (IESList.Contains(iesFileName))
+                        drn_LightIES.value = IESList.FindIndex(x => x.Contains(iesFileName));
                     else
                         drn_LightIES.captionText.text = iesFileName;
                     SelectedFlagCube.SetActive(true);
