@@ -230,10 +230,10 @@ public class UpdateMap : MonoBehaviour
                 //UnityEngine.Texture ies2DCookie = GetIESCookie(newIES);
                 //GameObject light = SelectedBuilding.transform.Find("Spot Light").gameObject;
                 //light.GetComponent<HDAdditionalLightData>().SetCookie(ies2DCookie);
-                Destroy(old_lightObject);
                 lightNodes[light_index].obj = lightObject;
                 lightNodes[light_index].LightPrefabName = newLightType;
                 SelectedBuilding = lightObject;
+                Destroy(old_lightObject);
             }
             Debug.Log("E005: " + SelectedBuilding.name + " light prefab model changed to " + newLightType);
         });
